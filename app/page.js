@@ -1,113 +1,285 @@
-import Image from 'next/image'
+"use client"
+import Header from "@/components/Header";
+import { useState, useEffect } from "react";
 
 export default function Home() {
+  const [productForm, setProductForm] = useState({})
+  const [products, setProducts] = useState([])
+  const [alert, setAlert] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [dropdown, setDropdown] = useState([])
+  const [loadingAction, setLoadingAction] = useState(false)
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      const API_URL = '/api/product';
+      const response = await fetch(API_URL)
+      const products_list = await response.json()
+      setProducts(products_list.products)
+    }
+    fetchProducts()
+  }, [])
+
+
+  const addProduct = async (e) => {
+    e.preventDefault();
+    const API_URL = '/api/product';
+    try {
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(productForm),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to add product');
+      }
+      console.log("Product added successfully")
+      setAlert("Product has been added!")
+      setProductForm({})
+      const response_list = await fetch(API_URL)
+      const products_list = await response_list.json()
+      setProducts(products_list.products)
+
+    } catch (error) {
+      console.error('Error adding product:', error);
+      throw error;
+    }
+
+  }
+
+  const handleChange = (e) => {
+    setProductForm({ ...productForm, [e.target.name]: e.target.value })
+  }
+
+  const handleDropdown = async (e) => {
+    const query_value = e.target.value
+    if (!loading) {
+      setLoading(true)
+      setDropdown([])
+      const API_URL = '/api/search?query=' + e.target.value;
+      const response = await fetch(API_URL)
+      const products_list = await response.json()
+      setDropdown(products_list.products)
+      setLoading(false)
+    }
+    if (!query_value){
+      setDropdown([])
+    }
+  }
+
+  const buttonAction = async (action, slug, initialQty) => {
+    setLoadingAction(true)
+    const response = await fetch('api/action', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({action, slug, initialQty}),
+    });
+
+    // Update dropdown and products state
+    // Update dropdown state
+    let productIndex = products.findIndex((item) => item.slug == slug)
+    let newProducts = JSON.parse(JSON.stringify(products))
+    if (action == "plus"){
+      newProducts[productIndex].qty = +initialQty + 1
+    } else {
+      newProducts[productIndex].qty = +initialQty - 1
+    }
+    setProducts(newProducts)
+    // Update product state
+    let dropdownIndex = dropdown.findIndex((item) => item.slug == slug)
+    let newDropdown = JSON.parse(JSON.stringify(dropdown))
+    if (action == "plus"){
+      newDropdown[dropdownIndex].qty = +initialQty + 1
+    } else {
+      newDropdown[dropdownIndex].qty = +initialQty - 1
+    }
+    setDropdown(newDropdown)
+
+    console.log(typeof initialQty)
+
+    setLoadingAction(false)
+  }
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 w-full max-w-5xl items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">app/page.js</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
+    <>
+      <Header />
+      {/* Add a product */}
+      <div className="container mx-auto p-4 my-5">
+        <div className="text-green-800 text-center">{alert}</div>
+        <h1 className="text-3xl font-semibold mb-4">Add a Product</h1>
+        <form className="w-full">
+          <div className="mb-4">
+            <label
+              htmlFor="product-name"
+              className="text-lg font-semibold mb-2"
+            >
+              Product Slug:
+            </label>
+            <input
+              name="slug"
+              value={productForm?.slug || ""}
+              onChange={handleChange}
+              type="text"
+              id="product-name"
+              className="border px-4 py-2 w-full"
             />
-          </a>
+          </div>
+          <div className="mb-4">
+            <label
+              htmlFor="product-quantity"
+              className="text-lg font-semibold mb-2"
+            >
+              Quantity:
+            </label>
+            <input
+              name="qty"
+              value={productForm?.qty || ""}
+              onChange={handleChange}
+              type="number"
+              id="product-quantity"
+              className="border px-4 py-2 w-full"
+            />
+          </div>
+          <div className="mb-4">
+            <label
+              htmlFor="product-price"
+              className="text-lg font-semibold mb-2"
+            >
+              Price:
+            </label>
+            <input
+              name="price"
+              value={productForm?.price || ""}
+              onChange={handleChange}
+              type="number"
+              id="product-price"
+              className="border px-4 py-2 w-full"
+            />
+          </div>
+          <button
+            onClick={addProduct}
+            type="submit"
+            className="bg-purple-500 hover:bg-purple-600 focus:bg-purple-700 text-white px-6 py-3 mt-4 rounded-lg transition-colors duration-300 ease-in-out"
+          >
+            Add Product
+          </button>
+        </form>
+      </div>
+      {/* Search a product */}
+      <div className="container mx-auto p-4 my-5">
+        <h1 className="text-3xl font-semibold mb-4">Search a Product</h1>
+        <div className="flex items-center mb-2">
+          <input
+            onChange={handleDropdown}
+            type="text"
+            id="search-input"
+            className="border px-4 py-2 w-full"
+            placeholder="Enter product name"
+          />
+          <select className="ml-2 border px-4 py-2">
+            <option value="">All</option>
+            <option value="category1">Category 1</option>
+            <option value="category2">Category 2</option>
+            {/* Add more options for different categories */}
+          </select>
         </div>
+        {loading && <div className="flex justify-center items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" width="160px" height="160px">
+            <g transform="rotate(0 50 50)">
+              <rect x="47" y="24" rx="3" ry="6" width="6" height="12" fill="#1d0e0b">
+                <animate attributeName="opacity" values="1;0" keyTimes="0;1" dur="1s" begin="-0.9166666666666666s" repeatCount="indefinite"></animate>
+              </rect>
+            </g><g transform="rotate(30 50 50)">
+              <rect x="47" y="24" rx="3" ry="6" width="6" height="12" fill="#1d0e0b">
+                <animate attributeName="opacity" values="1;0" keyTimes="0;1" dur="1s" begin="-0.8333333333333334s" repeatCount="indefinite"></animate>
+              </rect>
+            </g><g transform="rotate(60 50 50)">
+              <rect x="47" y="24" rx="3" ry="6" width="6" height="12" fill="#1d0e0b">
+                <animate attributeName="opacity" values="1;0" keyTimes="0;1" dur="1s" begin="-0.75s" repeatCount="indefinite"></animate>
+              </rect>
+            </g><g transform="rotate(90 50 50)">
+              <rect x="47" y="24" rx="3" ry="6" width="6" height="12" fill="#1d0e0b">
+                <animate attributeName="opacity" values="1;0" keyTimes="0;1" dur="1s" begin="-0.6666666666666666s" repeatCount="indefinite"></animate>
+              </rect>
+            </g><g transform="rotate(120 50 50)">
+              <rect x="47" y="24" rx="3" ry="6" width="6" height="12" fill="#1d0e0b">
+                <animate attributeName="opacity" values="1;0" keyTimes="0;1" dur="1s" begin="-0.5833333333333334s" repeatCount="indefinite"></animate>
+              </rect>
+            </g><g transform="rotate(150 50 50)">
+              <rect x="47" y="24" rx="3" ry="6" width="6" height="12" fill="#1d0e0b">
+                <animate attributeName="opacity" values="1;0" keyTimes="0;1" dur="1s" begin="-0.5s" repeatCount="indefinite"></animate>
+              </rect>
+            </g><g transform="rotate(180 50 50)">
+              <rect x="47" y="24" rx="3" ry="6" width="6" height="12" fill="#1d0e0b">
+                <animate attributeName="opacity" values="1;0" keyTimes="0;1" dur="1s" begin="-0.4166666666666667s" repeatCount="indefinite"></animate>
+              </rect>
+            </g><g transform="rotate(210 50 50)">
+              <rect x="47" y="24" rx="3" ry="6" width="6" height="12" fill="#1d0e0b">
+                <animate attributeName="opacity" values="1;0" keyTimes="0;1" dur="1s" begin="-0.3333333333333333s" repeatCount="indefinite"></animate>
+              </rect>
+            </g><g transform="rotate(240 50 50)">
+              <rect x="47" y="24" rx="3" ry="6" width="6" height="12" fill="#1d0e0b">
+                <animate attributeName="opacity" values="1;0" keyTimes="0;1" dur="1s" begin="-0.25s" repeatCount="indefinite"></animate>
+              </rect>
+            </g><g transform="rotate(270 50 50)">
+              <rect x="47" y="24" rx="3" ry="6" width="6" height="12" fill="#1d0e0b">
+                <animate attributeName="opacity" values="1;0" keyTimes="0;1" dur="1s" begin="-0.16666666666666666s" repeatCount="indefinite"></animate>
+              </rect>
+            </g><g transform="rotate(300 50 50)">
+              <rect x="47" y="24" rx="3" ry="6" width="6" height="12" fill="#1d0e0b">
+                <animate attributeName="opacity" values="1;0" keyTimes="0;1" dur="1s" begin="-0.08333333333333333s" repeatCount="indefinite"></animate>
+              </rect>
+            </g><g transform="rotate(330 50 50)">
+              <rect x="47" y="24" rx="3" ry="6" width="6" height="12" fill="#1d0e0b">
+                <animate attributeName="opacity" values="1;0" keyTimes="0;1" dur="1s" begin="0s" repeatCount="indefinite"></animate>
+              </rect>
+            </g>
+          </svg>
+        </div>
+        }
+        <div className="dropcontainer absolute w-[77vw] border-1 bg-purple-100 rounded-md shadow-md">
+          {dropdown.map(item => (
+            <div key={item.slug} className="container flex justify-between items-center p-2 my-1 border-b-2">
+              <span>{item.slug} ({item.qty} available for ₹{item.price} each)</span>
+              <div className="flex items-center">
+                <button onClick={() => buttonAction("minus", item.slug, item.qty)} disabled={loadingAction} className="subract bg-purple-500 text-white px-2 py-1 rounded-lg mx-2 shadow-md disabled:bg-purple-200">-</button>
+                <span className="qty text-purple-900 text-sm font-semibold w-8 text-center">{item.qty}</span>
+                <button onClick={() => buttonAction("plus", item.slug, item.qty)} disabled={loadingAction} className="add bg-purple-500 text-white px-2 py-1 rounded-lg mx-2 shadow-md disabled:bg-purple-200">+</button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Add other search-related components here */}
+        {/* E.g., search button, filters, etc. */}
       </div>
-
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 before:lg:h-[360px]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
+      {/* Display current stock */}
+      <div className="container mx-auto p-4 my-5">
+        <h1 className="text-3xl font-semibold mb-4">Display Current Stock</h1>
+        <table className="table-auto w-full">
+          <thead>
+            <tr>
+              <th className="px-4 py-2">Product</th>
+              <th className="px-4 py-2">Quantity</th>
+              <th className="px-4 py-2">Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.map(product => {
+              return <tr key={product.slug}>
+                <td className="border px-4 py-2">{product.slug}</td>
+                <td className="border px-4 py-2">{product.qty}</td>
+                <td className="border px-4 py-2">₹{product.price}</td>
+              </tr>
+            })}
+          </tbody>
+        </table>
       </div>
-
-      <div className="mb-32 grid text-center lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800 hover:dark:bg-opacity-30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Explore the Next.js 13 playground.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
-  )
+    </>
+  );
 }
